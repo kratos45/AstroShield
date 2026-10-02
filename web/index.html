@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AstroShield — Centre de Commandement & Surveillance Temps Réel NEO</title>
+  <meta name="description" content="Station avancée de défense planétaire AstroShield en JavaScript pur (Three.js 3D WebGL, Canvas 2D, Chart.js, WebSockets temps réel).">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <!-- Bibliothèques JS Avancées : Three.js (3D WebGL) + Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="theme-space">
+  <!-- Arrière-plan atmosphérique & nébuleuse -->
+  <div class="stars-backdrop"></div>
+  <div class="glow-orb glow-orb-1"></div>
+  <div class="glow-orb glow-orb-2"></div>
+
+  <!-- Bannière d'alerte critique planétaire -->
+  <div id="planetaryAlertBanner" class="alert-banner hidden">
+    <div class="alert-pulse-ring"></div>
+    <span class="alert-icon">🚨</span>
+    <span class="alert-text"><strong>ALERTE DÉFENSE PLANÉTAIRE :</strong> Rapprochement critique d'un astéroïde sous 1.0 Distance Lunaire !</span>
+    <button id="dismissAlertBtn" class="btn-ghost-sm" onclick="dismissBanner()">Fermer</button>
+  </div>
+
+  <!-- En-tête de Mission AstroShield avec Logo Officiel -->
+  <header class="mission-header">
+    <div class="header-left">
+      <div class="logo-container">
+        <img src="/logos/LOGO.jpg" alt="AstroShield Mission Logo" class="mission-logo" id="headerLogo">
+        <div class="logo-halo"></div>
+      </div>
+      <div class="mission-titles">
+        <div class="badge-hud">RÉSEAU DE DÉFENSE PLANÉTAIRE &amp; JS OPS V2.0</div>
+        <h1 class="system-title">ASTROSHIELD <span class="neon-sub">OPERATIONS</span></h1>
+        <p class="system-subtitle">Moteur JavaScript Temps Réel (Three.js 3D &bull; WebSockets &bull; Canvas &bull; Physics)</p>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="live-status-pill">
+        <span class="live-dot pulse"></span>
+        <span class="live-label">SCRAPING EN DIRECT : MPC NEOCP &amp; NASA CNEOS (AUTONOME)</span>
+      </div>
+      <div class="stream-telemetry">
+        <span id="socketStatus" class="tag-status tag-online">WS: CONNECTÉ</span>
+        <span id="scrapeStatus" class="tag-status tag-pulse">IAU &amp; NASA: LIVE</span>
+        <span id="viewFps" class="tag-status">FPS: 60</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="utc-clock-box">
+        <div class="clock-label">HORLOGE UNIVERSELLE (UTC)</div>
+        <div id="utcClock" class="clock-display">00:00:00 UTC</div>
+      </div>
+      <div class="header-actions">
+        <button id="audioToggleBtn" class="hud-btn hud-btn-audio" title="Activer / Désactiver les alertes sonores">
+          <span id="audioIcon">🔊</span> <span id="audioLabel">AUDIO ACTIF</span>
+        </button>
+        <button id="drillBtn" class="hud-btn hud-btn-danger" title="Simuler l'approche d'une menace critique">
+          <span>⚠️</span> <span>TEST MENACE</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Métriques Clés en Direct (KPI Ticker) -->
+  <section class="kpi-strip">
+    <div class="kpi-card" id="cardMpc">
+      <div class="kpi-icon">🔭</div>
+      <div class="kpi-content">
+        <div class="kpi-label">CANDIDATS IAU MPC NEOCP</div>
+        <div class="kpi-value" id="kpiMpcCount">--</div>
+        <div class="kpi-footnote">Nouvelles découvertes mondiales en direct</div>
+      </div>
+      <div class="kpi-spark"></div>
+    </div>
+
+    <div class="kpi-card" id="cardCneos">
+      <div class="kpi-icon">🌍</div>
+      <div class="kpi-content">
+        <div class="kpi-label">APPROCHES NASA CNEOS LIVE</div>
+        <div class="kpi-value" id="kpiCneosCount">--</div>
+        <div class="kpi-footnote" id="kpiClosestDist">Plus proche : -- LD</div>
+      </div>
+      <div class="kpi-spark"></div>
+    </div>
+
+    <div class="kpi-card kpi-card-danger" id="cardPha">
+      <div class="kpi-icon">🚨</div>
+      <div class="kpi-content">
+        <div class="kpi-label">MENACES PHA ACTIVES</div>
+        <div class="kpi-value" id="kpiPhaCount">--</div>
+        <div class="kpi-footnote">Distance &lt; 19.5 LD &amp; Diam &gt; 140 m</div>
+      </div>
+      <div class="kpi-spark danger"></div>
+    </div>
+
+    <div class="kpi-card" id="cardEnergy">
+      <div class="kpi-icon">💥</div>
+      <div class="kpi-content">
+        <div class="kpi-label">ÉNERGIE CINÉTIQUE MAX</div>
+        <div class="kpi-value" id="kpiMaxEnergy">-- <span class="kpi-unit">Mt TNT</span></div>
+        <div class="kpi-footnote" id="kpiEnergyCompare">Calcul d'impact balistique</div>
+      </div>
+      <div class="kpi-spark"></div>
+    </div>
+
+    <div class="kpi-card" id="cardVelocity">
+      <div class="kpi-icon">⚡</div>
+      <div class="kpi-content">
+        <div class="kpi-label">VITESSE RELATIVE MAX</div>
+        <div class="kpi-value" id="kpiMaxVelocity">-- <span class="kpi-unit">km/s</span></div>
+        <div class="kpi-footnote">Vitesse d'approche géocentrique</div>
+      </div>
+      <div class="kpi-spark"></div>
+    </div>
+  </section>
+
+  <!-- Grille Opérationnelle Centrale -->
+  <main class="dashboard-grid">
+    <!-- Colonne GAUCHE : Visualiseur Spatial Double Mode (Radar 2D & 3D WebGL Three.js) + Simulateur Physique -->
+    <div class="grid-col-primary">
+      
+      <!-- Panneau Visualiseur Spatial avec Bascule 2D / 3D -->
+      <section class="panel panel-radar">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-indicator indicator-cyan"></span>
+            <h2>SURVEILLANCE GÉOCENTRIQUE SPATIALE</h2>
+          </div>
+          
+          <!-- Sélecteur de Mode 2D Radar vs 3D WebGL -->
+          <div class="view-mode-selector">
+            <button id="viewMode3D" class="mode-btn active" title="Vue 3D WebGL interactive Three.js">🌐 3D SPATIAL (WEBGL)</button>
+            <button id="viewMode2D" class="mode-btn" title="Vue Radar tactique Canvas 2D">📡 2D RADAR TACTIQUE</button>
+          </div>
+
+          <div class="radar-legend">
+            <span class="legend-item"><span class="dot dot-safe"></span> Sûr</span>
+            <span class="legend-item"><span class="dot dot-warning"></span> &lt; 5 LD</span>
+            <span class="legend-item"><span class="dot dot-danger"></span> &lt; 1 LD / PHA</span>
+          </div>
+        </div>
+
+        <div class="radar-container" id="spatialViewport">
+          <!-- Vue 3D Three.js -->
+          <div id="threeContainer" class="viewport-3d"></div>
+          
+          <!-- Vue 2D Canvas Radar -->
+          <canvas id="radarCanvas" width="700" height="460" class="viewport-2d hidden"></canvas>
+          
+          <!-- Overlay Télémétrique HUD -->
+          <div class="radar-hud-overlay">
+            <div class="hud-stat-box">
+              <span class="hud-label">PORTÉE AFFICHÉE :</span>
+              <span class="hud-val">40 LD (15 376 000 km)</span>
+            </div>
+            <div class="hud-stat-box">
+              <span class="hud-label">INTERACTION :</span>
+              <span class="hud-val text-cyan">Souris (Rotation 3D, Zoom molette, Clic cible)</span>
+            </div>
+            <div id="radarTargetCard" class="hud-target-card hidden">
+              <div class="target-card-header">CIBLE VÉROUILLÉE <span id="targetName">--</span></div>
+              <div class="target-grid">
+                <div>Dist : <strong id="targetDist">--</strong></div>
+                <div>Vit : <strong id="targetVel">--</strong></div>
+                <div>Diam : <strong id="targetDiam">--</strong></div>
+                <div>Turin : <strong id="targetTorino">--</strong></div>
+              </div>
+              <button class="btn-target-simulate" onclick="loadLockedTargetToSim()">Charger dans le Simulateur</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panneau Simulateur d'Impact Schmidt-Holsapple -->
+      <section class="panel panel-physics">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-indicator indicator-cyan"></span>
+            <h2>SIMULATEUR D'IMPACT PLANÉTAIRE EN JAVASCRIPT (SCHMIDT-HOLSAPPLE)</h2>
+          </div>
+          <span class="panel-badge">MOTEUR PHYSIQUE EN TEMPS RÉEL</span>
+        </div>
+
+        <div class="physics-body">
+          <div class="sim-inputs">
+            <div class="input-group">
+              <label for="simDiam">Diamètre de l'Impacteur (<span id="simDiamVal">250</span> m) :</label>
+              <input type="range" id="simDiam" min="10" max="3000" step="10" value="250">
+            </div>
+
+            <div class="input-group">
+              <label for="simVel">Vitesse Relative (<span id="simVelVal">22</span> km/s) :</label>
+              <input type="range" id="simVel" min="11" max="55" step="1" value="22">
+            </div>
+
+            <div class="input-group">
+              <label for="simAngle">Angle d'Impact (<span id="simAngleVal">45</span>°) :</label>
+              <input type="range" id="simAngle" min="15" max="90" step="5" value="45">
+            </div>
+
+            <div class="input-group">
+              <label for="simTargetType">Type de Cible Terrestre :</label>
+              <select id="simTargetType" class="hud-select">
+                <option value="crystalline">Roche Cristalline / Granit (2700 kg/m³)</option>
+                <option value="sedimentary">Roches Sédimentaires (2400 kg/m³)</option>
+                <option value="water">Océan / Hydro-impact (1000 kg/m³)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="sim-outputs">
+            <div class="sim-metric-card">
+              <div class="metric-title">ÉNERGIE CINÉTIQUE LIBÉRÉE</div>
+              <div class="metric-value-lg text-danger" id="outEnergyMt">0 Mt</div>
+              <div class="metric-sub" id="outEnergyJoules">0 Joules</div>
+              <div class="metric-badge" id="outEnergyComp">Équivalence : --</div>
+            </div>
+
+            <div class="sim-metric-card">
+              <div class="metric-title">DIAMÈTRE DU CRATÈRE FINAL</div>
+              <div class="metric-value-lg text-warning" id="outCraterKm">0 km</div>
+              <div class="metric-sub" id="outCraterDepth">Profondeur estimée : 0 m</div>
+              <div class="metric-badge">Cratère complexe à pic central</div>
+            </div>
+
+            <div class="sim-metric-card">
+              <div class="metric-title">MAGNITUDE SÉISME ÉQUIVALENTE</div>
+              <div class="metric-value-lg text-cyan" id="outSeismicMag">M 0.0</div>
+              <div class="metric-sub">Échelle de Moment (Richter)</div>
+              <div class="metric-badge" id="outSeismicDesc">Séisme planétaire</div>
+            </div>
+
+            <div class="sim-metric-card">
+              <div class="metric-title">RAYON D'ONDE DE SOUFFLE</div>
+              <div class="metric-value-lg text-amber" id="outBlastRadius">0 km</div>
+              <div class="metric-sub">Surpression de 20 psi (Destruction)</div>
+              <div class="metric-badge">Zone d'évacuation immédiate</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Graphiques Télémétriques Chart.js en Direct -->
+      <section class="panel panel-charts">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-indicator indicator-green"></span>
+            <h2>ANALYSE TÉLÉMÉTRIQUE GRAPHIQUE EN DIRECT (CHART.JS)</h2>
+          </div>
+          <span class="panel-badge">FLUX WEBSOCKET SYNCHRONISÉ</span>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-box">
+            <div class="chart-header">DISTRIBUTION DES VITESSES RELATIVES (KM/S)</div>
+            <div class="chart-wrapper">
+              <canvas id="velocityChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-header">DISTANCES DE PASSAGE (DISTANCES LUNAIRES LD)</div>
+            <div class="chart-wrapper">
+              <canvas id="distanceChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Colonne DROITE : Flux Scraper en Direct & Échelle de Turin -->
+    <div class="grid-col-secondary">
+      
+      <!-- Terminal de Scraping Temps Réel -->
+      <section class="panel panel-terminal">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-indicator indicator-green"></span>
+            <h2>FLUX SCRAPER EN DIRECT (MPC + NASA CNEOS)</h2>
+          </div>
+          <div class="terminal-ctrls">
+            <span class="terminal-tag" id="terminalCounter">0 ÉVÉNEMENTS</span>
+            <button class="btn-ghost-sm" id="clearTerminalBtn" onclick="clearTerminal()">Vider</button>
+          </div>
+        </div>
+
+        <div class="terminal-container">
+          <div class="terminal-banner">
+            [JS-SYS] Moteur JavaScript connecté au flux WebSocket &mdash; Scraping autonome temps réel sans bouton.
+          </div>
+          <div id="terminalStream" class="terminal-stream">
+            <!-- Rempli en direct via WebSocket -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Matrice Échelle de Turin & Niveau de Menace -->
+      <section class="panel panel-torino">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-indicator indicator-amber"></span>
+            <h2>MATRICE D'ALERTE DE TURIN</h2>
+          </div>
+          <span class="panel-badge">STANDARD INTERNATIONAL IAU</span>
+        </div>
+
+        <div class="torino-body">
+          <div class="torino-gauge-box">
+            <div class="torino-val-display" id="torinoMaxVal">0</div>
+            <div class="torino-details">
+              <div class="torino-title" id="torinoTitle">NIVEAU 0 : ÉVÉNEMENT SANS DANGER</div>
+              <p class="torino-desc" id="torinoDesc">
+                La probabilité de collision est nulle ou négligeable. L'objet passera à distance de sécurité de la Terre.
+              </p>
+            </div>
+          </div>
+
+          <div class="torino-scale-bar">
+            <div class="torino-step step-0 active" title="Niveau 0 : Blanc / Aucun risque">0</div>
+            <div class="torino-step step-1" title="Niveau 1 : Vert / Normal">1</div>
+            <div class="torino-step step-2" title="Niveau 2 : Jaune / Attention astronomes">2</div>
+            <div class="torino-step step-3" title="Niveau 3 : Jaune / Attention soutenue">3</div>
+            <div class="torino-step step-4" title="Niveau 4 : Jaune / Rapprochement critique">4</div>
+            <div class="torino-step step-5" title="Niveau 5 : Orange / Menace sérieuse">5</div>
+            <div class="torino-step step-6" title="Niveau 6 : Orange / Menace majeure">6</div>
+            <div class="torino-step step-7" title="Niveau 7 : Orange / Collision probable">7</div>
+            <div class="torino-step step-8" title="Niveau 8 : Rouge / Collision certaine localisée">8</div>
+            <div class="torino-step step-9" title="Niveau 9 : Rouge / Collision certaine régionale">9</div>
+            <div class="torino-step step-10" title="Niveau 10 : Rouge / Catastrophe planétaire globale">10</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Carte d'Informations Système & Origine -->
+      <section class="panel panel-mission-info">
+        <div class="mission-info-grid">
+          <div class="info-cell">
+            <span class="cell-label">FRONTEND STACK :</span>
+            <span class="cell-val text-cyan">Three.js WebGL + Canvas + Chart.js</span>
+          </div>
+          <div class="info-cell">
+            <span class="cell-label">SCRAPER ENGINE :</span>
+            <span class="cell-val text-green">Autonome (MPC NEOCP &amp; CNEOS)</span>
+          </div>
+          <div class="info-cell">
+            <span class="cell-label">LATENCE WEBSOCKET :</span>
+            <span class="cell-val text-cyan" id="wsLatency">&lt; 10 ms</span>
+          </div>
+          <div class="info-cell">
+            <span class="cell-label">CONTRÔLE UTILISATEUR :</span>
+            <span class="cell-val text-highlight">Automatique (Sans aucun bouton)</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Section Inférieure Pleine Largeur : Tableau Dynamique des Approches -->
+  <section class="panel panel-table-section">
+    <div class="panel-header">
+      <div class="panel-title-group">
+        <span class="panel-indicator indicator-cyan"></span>
+        <h2>REGISTRE TEMPS RÉEL DES DÉCOUVERTES ET APPROCHES GÉOCROISEURS</h2>
+      </div>
+
+      <div class="table-filters">
+        <button class="filter-btn active" data-filter="all">Tous (<span id="countAll">0</span>)</button>
+        <button class="filter-btn" data-filter="critical">🚨 Critiques &lt; 5 LD (<span id="countCrit">0</span>)</button>
+        <button class="filter-btn" data-filter="pha">Menaces PHA (<span id="countPha">0</span>)</button>
+        <button class="filter-btn" data-filter="mpc">Candidats MPC NEOCP (<span id="countMpc">0</span>)</button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="hud-table" id="approachesTable">
+        <thead>
+          <tr>
+            <th>OBJET / DÉSIGNATION</th>
+            <th>SOURCE</th>
+            <th>DISTANCE DE PASSAGE</th>
+            <th>VITESSE ($v_{rel}$)</th>
+            <th>DIAMÈTRE ESTIMÉ</th>
+            <th>ÉNERGIE (TNT)</th>
+            <th>CRATÈRE POTENTIEL</th>
+            <th>TURIN / RISQUE</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="approachesTableBody">
+          <!-- Lignes générées et mises à jour en direct par JS -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Pied de page -->
+  <footer class="mission-footer">
+    <div class="footer-left">
+      ASTROSHIELD &copy; 2026 &mdash; Plateforme Avancée de Défense Planétaire &amp; Surveillance Temps Réel.
+    </div>
+    <div class="footer-right">
+      <span>Propulsé par JavaScript (Three.js WebGL &bull; WebSockets &bull; Canvas &bull; Schmidt-Holsapple Physics)</span>
+    </div>
+  </footer>
+
+  <!-- Script Principal de l'Application -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

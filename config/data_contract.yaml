@@ -1,0 +1,49 @@
+dataset: neo_approaches
+version: "1.0"
+grain: >
+  une ligne représente une approche (close approach) d'un astéroïde
+  géocroiseur vers la Terre à une date donnée
+owner: "AstroShield - projet ESEO Architectures BD"
+source:
+  primary: "NASA NeoWs (https://api.nasa.gov/neo/rest/v1/feed)"
+  secondary: "JPL SBDB (https://ssd-api.jpl.nasa.gov/sbdb.api)"
+business_key: [neo_id, approach_date]
+required_fields:
+  - neo_id
+  - approach_date
+  - miss_distance_km
+quality_rules:
+  completeness_key:
+    description: "neo_id est renseigné et non vide"
+    action: reject
+  valid_date:
+    description: "approach_date est une date valide (normalisée UTC)"
+    action: reject
+  domain_miss_distance:
+    description: "miss_distance_km dans une plage plausible (> limite atmosphère, < 0,5 UA)"
+    min: 1.0
+    max: 74800000.0
+    action: reject
+  domain_diameter:
+    description: "diameter_mid_km dans [0.001, 1000] si renseigné"
+    min: 0.001
+    max: 1000.0
+    action: reject
+  domain_magnitude:
+    description: "absolute_magnitude_h dans [-2, 35] si renseigné"
+    min: -2.0
+    max: 35.0
+    action: reject
+  domain_velocity:
+    description: "relative_velocity_kms dans [3.0, 72.0] km/s si renseigné"
+    min: 3.0
+    max: 72.0
+    action: reject
+  uniqueness_business_key:
+    description: "clé métier (neo_id, approach_date) non dupliquée"
+    action: deduplicate
+  freshness:
+    description: "observed_at (horodatage de collecte) âgé de moins de 48 h"
+    max_age_hours: 48
+    action: warn
+reject_threshold: 0.20

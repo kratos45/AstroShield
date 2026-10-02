@@ -1,0 +1,85 @@
+{
+  "pipeline": "astroshield",
+  "executed_at": "2026-10-02T20:02:38.431805+00:00",
+  "mode": "offline",
+  "source_files": [
+    "sample_source.json"
+  ],
+  "input_rows": 184,
+  "accepted_rows": 134,
+  "rejected_rows": 20,
+  "duplicates_removed": 30,
+  "rules": {
+    "completeness_key": 4,
+    "valid_date": 4,
+    "domain_miss_distance": 11,
+    "domain_diameter": 5,
+    "domain_magnitude": 0,
+    "domain_velocity": 0,
+    "uniqueness_business_key": 30
+  },
+  "warnings": {
+    "freshness": 0
+  },
+  "quality_status": "PASS",
+  "rejected_file": "data\\rejected\\rejected_rows.csv",
+  "stream_file": null,
+  "publish": {
+    "curated_rows": 134,
+    "lake_format": "parquet",
+    "lake_kb": 29.4,
+    "csv_kb": 35.2,
+    "compression_ratio": 1.2,
+    "marts": {
+      "mart_risk_daily": 14,
+      "mart_characterization": 25
+    }
+  },
+  "ml": {
+    "hazard_classifier": {
+      "status": "TRAINED",
+      "f1_score": 0.5,
+      "recall_hazardous": 0.5,
+      "n_train": 100,
+      "features": [
+        "absolute_magnitude_h",
+        "miss_distance_km",
+        "relative_velocity_kms",
+        "diameter_mid_km",
+        "semi_major_axis_au",
+        "eccentricity",
+        "inclination_deg"
+      ],
+      "note": "baseline de référence : la classe JPL est quasi déterministe"
+    },
+    "diameter_regressor": {
+      "status": "TRAINED",
+      "r2_score": 0.544,
+      "mae_km": 9.511,
+      "n_train": 100,
+      "features": [
+        "absolute_magnitude_h",
+        "albedo"
+      ],
+      "note": "imputation du diamètre inconnu (H -> diamètre, seul albedo connu à ~10 %)"
+    },
+    "orbital_anomalies": {
+      "status": "TRAINED",
+      "features": [
+        "semi_major_axis_au",
+        "eccentricity",
+        "inclination_deg",
+        "absolute_magnitude_h"
+      ],
+      "n_samples": 134,
+      "anomalies_detected": 7,
+      "contamination": 0.05
+    },
+    "approach_forecast_lstm": {
+      "status": "SKIPPED",
+      "reason": "torch non installé (voir requirements, section optionnelle)"
+    }
+  },
+  "duration_seconds": 3.79,
+  "idempotence": "clé métier (neo_id, approach_date) + UPSERT SQLite : relancer ne duplique rien"
+}
