@@ -111,26 +111,26 @@ AstroShield repose sur une architecture moderne de type **Lakehouse (Médaillon 
 ### 1. Organisation des couches de données (Médaillon)
 
 ```mermaid
-graph TD
-    subgraph Bronze["🥉 Couche Bronze (Raw Lake — Données brutes immuables)"]
-        R1["data/raw/neows_*.json<br/>(Éphémérides NeoWs NASA)"]
-        R2["data/raw/sbdb_*.json<br/>(Paramètres physiques SBDB)"]
-        R3["data/raw/realtime_scraped.jsonl<br/>(Scraper live MPC & CNEOS)"]
+flowchart TD
+    subgraph Bronze [Couche Bronze - Raw Lake]
+        R1[data/raw/neows - Ephemerides NeoWs]
+        R2[data/raw/sbdb - Parametres SBDB]
+        R3[data/raw/realtime_scraped - Scraper Live]
     end
 
-    subgraph Silver["🥈 Couche Silver (Curated Lake — Données validées & dédupliquées)"]
-        S1["data/curated/neo_approaches.parquet<br/>(Format colonnaire optimisé, compression Snappy)"]
-        S2["data/rejected/rejected_rows.csv<br/>(Rejets d'audit avec motif exact)"]
+    subgraph Silver [Couche Silver - Curated Lake]
+        S1[data/curated/neo_approaches.parquet]
+        S2[data/rejected/rejected_rows.csv]
     end
 
-    subgraph Gold["🥇 Couche Gold (Warehouse & Data Marts SQLite — data/astroshield.db)"]
-        G1["neo_approaches<br/>(Table de faits centrale consolidée)"]
-        G2["mart_risk_daily<br/>(Data Mart : Risque quotidien agrégé)"]
-        G3["mart_characterization<br/>(Data Mart : Profiling par astéroïde)"]
+    subgraph Gold [Couche Gold - SQLite Warehouse]
+        G1[neo_approaches - Table Centrale]
+        G2[mart_risk_daily - Data Mart Risque]
+        G3[mart_characterization - Data Mart Profil]
     end
 
-    Bronze -->|Validation qualité 7 règles| Silver
-    Silver -->|Enrichissement astrophysique| Gold
+    Bronze --> Silver
+    Silver --> Gold
 ```
 
 - **Bronze (Zone brute)** : Stockage append-only des flux JSON/JSONL horodatés sans altération.
@@ -143,65 +143,45 @@ graph TD
 
 ```mermaid
 erDiagram
-    neo_approaches {
-        TEXT neo_id PK "Identifiant NASA JPL"
-        TEXT name "Désignation astéroïde"
-        TEXT approach_date PK "Date de passage UTC (YYYY-MM-DD)"
-        REAL miss_distance_km "Distance de passage (km)"
-        REAL lunar_distance_ld "Distance en unités lunaires (LD)"
-        REAL relative_velocity_kms "Vitesse relative (km/s)"
-        REAL diameter_min_km "Diamètre minimum estimé"
-        REAL diameter_max_km "Diamètre maximum estimé"
-        REAL diameter_mid_km "Diamètre moyen géométrique"
-        REAL absolute_magnitude_h "Magnitude absolue H"
-        INTEGER is_potentially_hazardous "Flag binaire PHA (0/1)"
-        REAL semi_major_axis_au "Demi-grand axe a (UA)"
-        REAL eccentricity "Excentricité orbitale e"
-        REAL inclination_deg "Inclinaison orbitale i (deg)"
-        REAL perihelion_au "Périhélie q (UA)"
-        REAL aphelion_au "Aphélie ad (UA)"
-        REAL albedo "Albédo géométrique"
-        TEXT spectral_family "Famille spectrale (C/S/M)"
-        TEXT dynamical_class "Classe orbitale (Apollo/Amor/Aten/Atira)"
-        REAL energy_proxy_j "Énergie cinétique (Joules)"
-        REAL tnt_megatons "Énergie d'impact (Mégatonnes TNT)"
-        REAL crater_diameter_km "Diamètre cratère final (Schmidt-Holsapple)"
-        INTEGER torino_scale "Indice de danger (Échelle de Turin 0-10)"
-        REAL tisserand_jupiter "Invariant de Tisserand T_J"
-        TEXT hazard_level "Niveau d'alerte opérationnel"
-        TIMESTAMP observed_at "Horodatage de collecte"
+    NEO_APPROACHES ||--o{ MART_RISK_DAILY : aggregates
+    NEO_APPROACHES ||--o{ MART_CHARACTERIZATION : characterizes
+
+    NEO_APPROACHES {
+        string neo_id PK
+        string approach_date PK
+        string name
+        float miss_distance_km
+        float lunar_distance_ld
+        float relative_velocity_kms
+        float diameter_mid_km
+        float absolute_magnitude_h
+        int is_potentially_hazardous
+        float tnt_megatons
+        float crater_diameter_km
+        int torino_scale
+        string dynamical_class
+        string spectral_family
     }
 
-    mart_risk_daily {
-        TEXT approach_date PK "Date de l'agrégat quotidien"
-        INTEGER neo_count "Nombre d'approches recensées"
-        INTEGER pha_count "Nombre d'objets potentiellement dangereux (PHA)"
-        REAL min_miss_km "Distance minimale de passage (km)"
-        REAL min_miss_ld "Distance minimale de passage (LD)"
-        REAL avg_miss_km "Distance moyenne (km)"
-        REAL avg_diameter_km "Diamètre moyen des objets (km)"
-        REAL max_energy_proxy "Énergie cinétique maximale (J)"
-        REAL max_tnt_megatons "Énergie maximale estimée (Mt TNT)"
-        INTEGER max_torino "Niveau maximal sur l'Échelle de Turin"
+    MART_RISK_DAILY {
+        string approach_date PK
+        int neo_count
+        int pha_count
+        float min_miss_ld
+        float max_tnt_megatons
+        int max_torino
     }
 
-    mart_characterization {
-        TEXT neo_id PK "Identifiant astéroïde"
-        TEXT name "Nom officiel de l'objet"
-        INTEGER observation_count "Nombre total d'approches observées"
-        REAL min_miss_km "Plus petite distance jamais enregistrée"
-        REAL avg_diameter_km "Diamètre moyen de l'objet (km)"
-        INTEGER is_pha "Classification PHA (0/1)"
-        TEXT spectral_family "Composition spectrale (C/S/M)"
-        TEXT dynamical_class "Famille dynamique (Apollo/Amor/Aten/Atira)"
-        TEXT hazard_level "Niveau de risque global"
-        REAL tisserand_jupiter "Invariant de Tisserand T_J"
-        REAL crater_diameter_km "Cratère potentiel maximal (km)"
-        REAL tnt_megatons "Énergie potentielle maximale (Mt TNT)"
+    MART_CHARACTERIZATION {
+        string neo_id PK
+        string name
+        int observation_count
+        float min_miss_km
+        float avg_diameter_km
+        int is_pha
+        string spectral_family
+        string dynamical_class
     }
-
-    neo_approaches ||--o{ mart_risk_daily : "agrégé par approach_date"
-    neo_approaches ||--o{ mart_characterization : "agrégé par (neo_id, name)"
 ```
 
 ---
